@@ -2,7 +2,21 @@
 
 基于 **FastAPI** 重构的 Grok2API，全面适配最新 Web 调用格式，支持流式对话、图像生成、图像编辑、联网搜索、深度思考，号池并发与自动负载均衡一体化
 
+## 🆕 Fork 增强功能
 
+本 Fork 在原版基础上新增以下功能：
+
+- **多 Key 管理与持久化**：支持管理员批量创建、备注、删除 API Key，支持多选批量操作。所有密钥均实现持久化存储，重启不丢失。
+- **日志审计支持**：实时记录请求细节，且日志数据支持文件持久化存储。
+- **并发性能优化 (Critical)**：重构了底层的 Grok 请求和响应处理逻辑。采用全异步流式迭代 (`aiter_lines`)，彻底解决了在消息生成过程中后台管理面板“卡死”或响应缓慢的问题。
+- **Token 智能冷却**：请求失败后自动冷却，避免连续使用故障 Token
+  - 普通错误：冷却 5 次请求
+  - 429 限流 + 有额度：冷却 1 小时
+  - 429 限流 + 无额度：冷却 10 小时
+- **一键刷新所有 Token**：后台按钮批量刷新剩余次数，带实时进度显示
+- **并发保护**：刷新任务进行中自动拒绝重复请求
+- **请求统计与持久化**：按小时/天统计请求趋势，包含成功率和模型分布图表，统计数据支持持久化。
+- **缓存预览**：后台添加缓存预览板块，可查看缓存的图片/视频
 <br>
 
 ## 使用说明
@@ -60,29 +74,63 @@ curl https://你的服务器地址/v1/chat/completions \
 
 ## 如何部署
 
-### docker-compose
+### 方式一：Docker Compose（推荐）
 
+由于本项目包含修改，建议直接构建运行：
+
+1. 克隆本仓库
+```bash
+git clone https://github.com/Tomiya233/grok2api.git
+cd grok2api
+```
+
+2. 启动服务
+```bash
+docker-compose up -d --build
+```
+
+**docker-compose.yml 参考：**
 ```yaml
 services:
   grok2api:
-    image: ghcr.io/chenyme/grok2api:latest
+    build: .
+    image: grok2api:latest
+    container_name: grok2api
+    restart: always
     ports:
       - "8000:8000"
     volumes:
       - grok_data:/app/data
       - ./logs:/app/logs
     environment:
-      # =====存储模式: file, mysql 或 redis=====
-      - STORAGE_MODE=file
-      # =====数据库连接 URL (仅在STORAGE_MODE=mysql或redis时需要)=====
-      # - DATABASE_URL=mysql://user:password@host:3306/grok2api
-
-      ## MySQL格式: mysql://user:password@host:port/database
-      ## Redis格式: redis://host:port/db 或 redis://user:password@host:port/db (SSL: rediss://)
+      - LOG_LEVEL=INFO
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   grok_data:
 ```
+
+### 方式二：Python 直接运行
+
+**前置要求**：Python 3.10+，建议使用 `uv` 包管理器
+
+1. 安装 uv
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+2. 运行服务
+```bash
+# 安装依赖并运行
+uv sync
+uv run python main.py
+```
+
+服务默认运行在 `http://127.0.0.1:8000`
 
 ### 环境变量说明
 
@@ -134,6 +182,15 @@ volumes:
 | POST  | /api/tokens/test        | 测试 Token 可用性   | ✅   |
 | GET   | /api/tokens/tags/all    | 获取所有标签列表    | ✅   |
 | GET   | /api/storage/mode       | 获取存储模式信息    | ✅   |
+| POST  | /api/tokens/refresh-all | 一键刷新所有Token   | ✅   |
+| GET   | /api/tokens/refresh-progress | 获取刷新进度       | ✅   |
+| GET   | /api/keys               | 获取 API Key 列表  | ✅   |
+| POST  | /api/keys/add           | 创建新 API Key     | ✅   |
+| POST  | /api/keys/delete        | 删除 API Key       | ✅   |
+| POST  | /api/keys/status        | 切换 Key 启用状态  | ✅   |
+| POST  | /api/keys/name          | 修改 Key 备注名称  | ✅   |
+| GET   | /api/logs               | 获取请求日志(1000条)| ✅   |
+| POST  | /api/logs/clear         | 清空所有审计日志   | ✅   |
 
 </details>
 

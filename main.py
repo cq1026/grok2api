@@ -72,6 +72,18 @@ async def lifespan(app: FastAPI):
     await token_manager._load_data()
     logger.info("[Grok2API] Token数据加载完成")
     
+    # 3.5. 加载 API Key 数据
+    from app.services.api_keys import api_key_manager
+    await api_key_manager.init()
+    logger.info("[Grok2API] API Key数据加载完成")
+
+    # 3.6. 加载统计和日志数据
+    from app.services.request_stats import request_stats
+    from app.services.request_logger import request_logger
+    await request_stats.init()
+    await request_logger.init()
+    logger.info("[Grok2API] 统计和日志数据加载完成")
+    
     # 4. 启动批量保存任务
     await token_manager.start_batch_save()
 
@@ -101,6 +113,7 @@ async def lifespan(app: FastAPI):
 
 # 初始化日志
 logger.info("[Grok2API] 应用正在启动...")
+logger.info("[Grok2API] Fork 版本维护: @Tomiya233")
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -168,7 +181,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8001,
+        port=8000,
         workers=workers,
         loop=loop_type
     )
